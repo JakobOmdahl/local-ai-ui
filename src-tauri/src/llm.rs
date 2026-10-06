@@ -23,7 +23,6 @@ impl LlmEngine {
     }
 
     pub fn generate(&mut self, backend: &LlamaBackend, prompt: &str) -> Result<String, String> {
-        // 3. Create context
         let ctx_params =
             LlamaContextParams::default().with_n_ctx(Some(NonZeroU32::new(2048).unwrap()));
 
@@ -34,13 +33,8 @@ impl LlmEngine {
 
         let vocab = self.model.vocab();
 
-        let tokens = vocab.tokenize(
-            prompt.as_bytes(),
-            true, // add_special
-            true, // parse_special
-        );
+        let tokens = vocab.tokenize(prompt.as_bytes(), true, true);
 
-        // 5. Create initial batch
         let mut batch = LlamaBatch::new(512, 1);
 
         let last_index = tokens.len() - 1;
@@ -51,10 +45,8 @@ impl LlmEngine {
                 .map_err(|e| e.to_string())?;
         }
 
-        // 6. Feed prompt into model
         ctx.decode(&mut batch).map_err(|e| e.to_string())?;
 
-        // 7. Configure sampling
         let mut sampler =
             LlamaSampler::chain_simple([LlamaSampler::temp(0.7), LlamaSampler::dist(1234)]);
 
@@ -62,24 +54,20 @@ impl LlmEngine {
 
         let mut position = tokens.len() as i32;
 
-        // 8. Generate up to 200 tokens
         for _ in 0..500 {
             let token = sampler.sample(&ctx, batch.n_tokens() - 1);
 
             sampler.accept(token);
 
-            // Stop when model emits EOS/EOG
             if vocab.is_eog(token) {
                 break;
             }
 
-            // Convert token -> text
             let bytes = vocab.token_to_piece(token, true, None);
 
             let text = String::from_utf8_lossy(&bytes);
             output.push_str(&text);
 
-            // Feed generated token back into model
             batch.clear();
 
             batch
