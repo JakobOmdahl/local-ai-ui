@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Local AI</title>
+
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="/main.js" defer></script>
+  </head>
+
+  <body>
+
+    <!-- Model setup view -->
+    <section id="setup-view" class="setup-view">
+      <div class="setup-card">
+        <h1>Local AI</h1>
+
+        <p>
+          Select the path to a local GGUF model.
+        </p>
+
+        <input
+          id="model-path"
+          type="text"
+          placeholder="D:\Models\model.gguf"
+        />
+
+        <button id="load-model-button" type="button">
+          Load model
+        </button>
+
+        <p id="model-error"></p>
+      </div>
+    </section>
+
+
+    <!-- Chat view -->
+    <main id="chat-view" class="chat-shell hidden">
+
+      <header class="chat-header">
+        <div>
+          <h1>Local AI</h1>
+          <p id="current-model"></p>
+        </div>
+
+        <div class="header-controls">
+          <button id="change-model-button" type="button">
+            Change model
+          </button>
+
+          <label class="mode-control">
+            <span>Mode</span>
+
+            <select id="mode-select">
+              <option value="add">Add</option>
+              <option value="new">New</option>
+            </select>
+          </label>
+        </div>
+      </header>
+
+
+      <!-- Messages -->
+      <section id="chat" class="chat" aria-live="polite">
+        <div class="empty-state" id="empty-state">
+          <h2>Start a conversation</h2>
+
+          <p>
+            Add keeps previous messages as context.
+            New starts from a fresh prompt every time.
+          </p>
+        </div>
+      </section>
+
+
+      <!-- Message input -->
+      <form id="chat-form" class="composer">
+        <textarea
+          id="chat-input"
+          rows="1"
+          placeholder="Message your local model..."
+          autocomplete="off"
+        ></textarea>
+
+        <button id="send-button" type="submit">
+          Send
+        </button>
+        <button id="clear-button" type="button">Clear</button>
+      </form>
+
+    </main>
+
+  </body>
+</html>
