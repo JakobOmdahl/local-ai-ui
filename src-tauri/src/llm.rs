@@ -23,8 +23,11 @@ impl LlmEngine {
     }
 
     pub fn generate(&mut self, backend: &LlamaBackend, prompt: &str) -> Result<String, String> {
-        let ctx_params =
-            LlamaContextParams::default().with_n_ctx(Some(NonZeroU32::new(2048).unwrap()));
+        let stop_sequences = ["<END>", "\nUser:", "<|im_end|>"];
+        let ctx_params = LlamaContextParams::default()
+            .with_n_ctx(NonZeroU32::new(32000))
+            .with_n_batch(512)
+            .with_n_ubatch(512);
 
         let mut ctx = self
             .model
@@ -35,17 +38,27 @@ impl LlmEngine {
 
         let tokens = vocab.tokenize(prompt.as_bytes(), true, true);
 
+        println!("Prompt tokens: {}", tokens.len());
+
         let mut batch = LlamaBatch::new(512, 1);
 
-        let last_index = tokens.len() - 1;
+        let batch_size = 512usize;
 
-        for (i, token) in tokens.iter().enumerate() {
-            batch
-                .add(*token, i as i32, &[0], i == last_index)
-                .map_err(|e| e.to_string())?;
+        for (chunk_index, chunk) in tokens.chunks(batch_size).enumerate() {
+            batch.clear();
+
+            let start = chunk_index * batch_size;
+
+            for (i, token) in chunk.iter().enumerate() {
+                let position = start + i;
+                let is_last = position == tokens.len() - 1;
+                batch
+                    .add(*token, position as i32, &[0], is_last)
+                    .map_err(|e| e.to_string())?;
+            }
+
+            ctx.decode(&mut batch).map_err(|e| e.to_string())?;
         }
-
-        ctx.decode(&mut batch).map_err(|e| e.to_string())?;
 
         let mut sampler =
             LlamaSampler::chain_simple([LlamaSampler::temp(0.7), LlamaSampler::dist(1234)]);
@@ -67,6 +80,11 @@ impl LlmEngine {
 
             let text = String::from_utf8_lossy(&bytes);
             output.push_str(&text);
+
+            if let Some(stop) = stop_sequences.iter().find(|stop| output.ends_with(**stop)) {
+                output.truncate(output.len() - stop.len());
+                break;
+            }
 
             batch.clear();
 
