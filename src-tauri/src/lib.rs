@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use std::{fs, path::PathBuf};
 
+use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager};
 
 pub struct AppState {
@@ -151,7 +152,11 @@ async fn set_model_path(
 }
 
 #[tauri::command]
-async fn greet(state: tauri::State<'_, AppState>, prompt: String) -> Result<String, String> {
+async fn greet(
+    state: tauri::State<'_, AppState>,
+    prompt: String,
+    on_text: Channel<String>,
+) -> Result<String, String> {
     let llm = Arc::clone(&state.llm);
     let backend = Arc::clone(&state.backend);
     tauri::async_runtime::spawn_blocking(move || {
@@ -159,7 +164,9 @@ async fn greet(state: tauri::State<'_, AppState>, prompt: String) -> Result<Stri
         let engine = llm
             .as_mut()
             .ok_or_else(|| "No model is currently loaded.".to_string())?;
-        engine.generate(&backend, &prompt)
+        engine.generate(&backend, &prompt, |t| {
+            on_text.send(t.to_string()).ok();
+        })
     })
     .await
     .map_err(|e| e.to_string())?

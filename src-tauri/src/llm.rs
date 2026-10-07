@@ -22,7 +22,12 @@ impl LlmEngine {
         Ok(Self { model })
     }
 
-    pub fn generate(&mut self, backend: &LlamaBackend, prompt: &str) -> Result<String, String> {
+    pub fn generate(
+        &mut self,
+        backend: &LlamaBackend,
+        prompt: &str,
+        mut on_text: impl FnMut(&str),
+    ) -> Result<String, String> {
         let stop_sequences = ["<END>", "\nUser:", "<|im_end|>"];
         let ctx_params = LlamaContextParams::default()
             .with_n_ctx(NonZeroU32::new(32000))
@@ -31,7 +36,7 @@ impl LlmEngine {
 
         let mut ctx = self
             .model
-            .new_context(&backend, ctx_params)
+            .new_context(backend, ctx_params)
             .map_err(|e| e.to_string())?;
 
         let vocab = self.model.vocab();
@@ -66,6 +71,7 @@ impl LlmEngine {
         let mut output = String::new();
 
         let mut position = tokens.len() as i32;
+        let mut sent: usize = 0;
 
         for _ in 0..500 {
             let token = sampler.sample(&ctx, batch.n_tokens() - 1);
@@ -86,6 +92,15 @@ impl LlmEngine {
                 break;
             }
 
+            let hold = stop_sequences
+                .iter()
+                .filter_map(|s| (1..s.len()).rev().find(|&n| output.ends_with(&s[..n])))
+                .max()
+                .unwrap_or(0);
+
+            on_text(&output[sent..output.len() - hold]);
+            sent = output.len() - hold;
+
             batch.clear();
 
             batch
@@ -95,6 +110,10 @@ impl LlmEngine {
             ctx.decode(&mut batch).map_err(|e| e.to_string())?;
 
             position += 1;
+        }
+
+        if let Some(rest) = output.get(sent..) {
+            on_text(rest);
         }
 
         Ok(output)

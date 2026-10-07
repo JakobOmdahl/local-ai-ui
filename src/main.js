@@ -1,4 +1,4 @@
-const { invoke } = window.__TAURI__.core;
+const { invoke, Channel } = window.__TAURI__.core;
 
 const setupView = document.querySelector("#setup-view");
 
@@ -91,7 +91,7 @@ function buildPrompt() {
 
                 return `${name}: ${content}`;
             })
-            .join("\n\n") + "\n\nAssistant:"
+            .join("\n\n") + "\n\nAssistant:\n"
     );
 }
 
@@ -129,7 +129,7 @@ async function sendMessage() {
 
     sendButtonEl.disabled = true;
 
-    const responseEl = addMessage("assistant", "Thinking...");
+    const responseEl = addMessage("assistant", "");
 
     responseEl.classList.add("pending");
 
@@ -142,12 +142,13 @@ async function sendMessage() {
             prompt = text;
         }
 
-        const response = await invoke("greet", {
-            prompt: prompt,
-        });
+        const onText = new Channel();
+        onText.onmessage = (t) => {
+          responseEl.classList.remove("pending");
+          responseEl.textContent += t;
+        };
 
-        responseEl.textContent = response;
-        responseEl.classList.remove("pending");
+        const response = await invoke("greet", { prompt, onText });
 
         history.push({
             role: "assistant",
