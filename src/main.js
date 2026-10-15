@@ -136,16 +136,12 @@ async function sendMessage() {
     try {
         let prompt;
 
-        if (mode === "add") {
-            prompt = buildPrompt();
-        } else {
-            prompt = text;
-        }
+        prompt = buildPrompt();
 
         const onText = new Channel();
         onText.onmessage = (t) => {
-          responseEl.classList.remove("pending");
-          responseEl.textContent += t;
+            responseEl.classList.remove("pending");
+            responseEl.textContent += t;
         };
 
         const response = await invoke("greet", { prompt, onText });
